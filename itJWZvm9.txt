@@ -1,0 +1,514 @@
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local TweenService = game:GetService("TweenService")
+
+-- [[ SOUND EFFECT ON RUN ]] --
+task.spawn(function()
+    for i = 1, 4 do
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://99657116316657"
+        sound.Volume = 10 
+        sound.Parent = game:GetService("SoundService")
+        sound:Play()
+        sound.Ended:Wait()
+        sound:Destroy()
+        task.wait(0.1)
+    end
+end)
+
+-- [[ CONFIGURATION ]] --
+local TELEPORT_COORD = Vector3.new(-260, 14, 1164)
+local AUTO_PROMPT_RANGE = 100 
+local AUTO_PROMPT_DELAY = 1 
+
+-- [[ THEME COLORS ]] --
+local MainColor = Color3.fromRGB(10, 10, 10)
+local SecondaryColor = Color3.fromRGB(20, 0, 0)
+local AccentColor = Color3.fromRGB(255, 0, 0)
+local DarkAccent = Color3.fromRGB(150, 0, 0)
+local TextColor = Color3.fromRGB(255, 255, 255)
+
+-- [[ UTILITIES ]] --
+local function GetBouncingColor()
+    local sinValue = math.sin(tick() * 2)
+    local lerpFactor = (sinValue + 1) / 2
+    return Color3.fromRGB(0, 0, 0):Lerp(Color3.fromRGB(255, 0, 0), lerpFactor)
+end
+
+local function Tween(obj, info, goal)
+    return TweenService:Create(obj, TweenInfo.new(info), goal):Play()
+end
+
+local function makeDraggable(topbar, object)
+	local dragging, dragInput, dragStart, startPos
+	topbar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = object.Position
+		end
+	end)
+	topbar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+	topbar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+end
+
+-- [[ UI CREATION ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WarV2_Enhanced"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 520, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -210)
+MainFrame.BackgroundColor3 = MainColor
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = AccentColor
+MainStroke.Thickness = 1.5
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 45)
+TopBar.BackgroundColor3 = SecondaryColor
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
+
+local TopBarLine = Instance.new("Frame", TopBar)
+TopBarLine.Size = UDim2.new(1, 0, 0, 2)
+TopBarLine.Position = UDim2.new(0, 0, 1, -2)
+TopBarLine.BackgroundColor3 = AccentColor
+TopBarLine.BorderSizePixel = 0
+
+makeDraggable(TopBar, MainFrame)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "WAR SCRIPT V.2 [MODDED]"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = TextColor
+Title.Parent = TopBar
+task.spawn(function() while true do Title.TextColor3 = GetBouncingColor() ; task.wait() end end)
+
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 150, 1, -45)
+Sidebar.Position = UDim2.new(0, 0, 0, 45)
+Sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = MainFrame
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 10)
+
+local TabButtons = {}
+
+local function createTabBtn(txt, pos)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.9, 0, 0, 40)
+    b.Position = UDim2.new(0.05, 0, 0, pos)
+    b.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
+    b.Text = txt
+    b.TextColor3 = Color3.fromRGB(200, 200, 200)
+    b.Font = Enum.Font.GothamMedium
+    b.TextSize = 14
+    b.Parent = Sidebar
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    
+    local s = Instance.new("UIStroke", b)
+    s.Color = DarkAccent
+    s.Thickness = 1
+
+    b.MouseEnter:Connect(function() Tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(60, 0, 0)}) end)
+    b.MouseLeave:Connect(function() 
+        if b.TextColor3 ~= AccentColor then
+            Tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(25, 5, 5)}) 
+        end
+    end)
+
+    table.insert(TabButtons, b)
+    return b
+end
+
+local Tab1Btn = createTabBtn("📦 FARMING", 15)
+local Tab2Btn = createTabBtn("🎯 COMBAT", 65)
+local Tab4Btn = createTabBtn("🔫 GUN MODS", 115) 
+local Tab3Btn = createTabBtn("👁️ VISUALS", 165)
+
+local Pages = Instance.new("Frame", MainFrame)
+Pages.Size = UDim2.new(1, -165, 1, -60)
+Pages.Position = UDim2.new(0, 160, 0, 55)
+Pages.BackgroundTransparency = 1
+
+local function createPage()
+    local p = Instance.new("ScrollingFrame", Pages)
+    p.Size = UDim2.new(1, 0, 1, 0)
+    p.BackgroundTransparency = 1
+    p.Visible = false
+    p.ScrollBarThickness = 3
+    p.ScrollBarImageColor3 = AccentColor
+    local l = Instance.new("UIListLayout", p)
+    l.Padding = UDim.new(0, 10)
+    l.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    return p
+end
+
+local Page1 = createPage()
+local Page2 = createPage()
+local Page3 = createPage()
+local Page4 = createPage()
+
+local function showPage(page, btn)
+    Page1.Visible = false ; Page2.Visible = false ; Page3.Visible = false ; Page4.Visible = false
+    for _, b in pairs(TabButtons) do
+        Tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(25, 5, 5), TextColor3 = Color3.fromRGB(200, 200, 200)})
+        b:FindFirstChildOfClass("UIStroke").Color = DarkAccent
+    end
+    page.Visible = true
+    Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(100, 0, 0), TextColor3 = Color3.fromRGB(255, 255, 255)})
+    btn:FindFirstChildOfClass("UIStroke").Color = AccentColor
+end
+
+Tab1Btn.MouseButton1Click:Connect(function() showPage(Page1, Tab1Btn) end)
+Tab2Btn.MouseButton1Click:Connect(function() showPage(Page2, Tab2Btn) end)
+Tab3Btn.MouseButton1Click:Connect(function() showPage(Page3, Tab3Btn) end)
+Tab4Btn.MouseButton1Click:Connect(function() showPage(Page4, Tab4Btn) end)
+showPage(Page1, Tab1Btn)
+
+local function createBtn(txt, color, parent)
+	local b = Instance.new("TextButton") 
+    b.Size = UDim2.new(0.95, 0, 0, 38) 
+    b.BackgroundColor3 = color 
+    b.Text = txt 
+    b.TextColor3 = Color3.new(1, 1, 1) 
+    b.Font = Enum.Font.GothamBold 
+    b.TextSize = 13 
+    b.Parent = parent 
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    
+    local s = Instance.new("UIStroke", b)
+    s.Thickness = 1.2
+    s.Color = Color3.new(1,1,1)
+    s.Transparency = 0.8
+
+    b.MouseEnter:Connect(function() Tween(b, 0.1, {Size = UDim2.new(0.98, 0, 0, 40)}) end)
+    b.MouseLeave:Connect(function() Tween(b, 0.1, {Size = UDim2.new(0.95, 0, 0, 38)}) end)
+
+	return b
+end
+
+-- [[ GUN MOD LOGIC ]] --
+local function ApplyGunMod(mode)
+    local char = LocalPlayer.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if tool and tool:FindFirstChild("Setting") then
+        local gun = require(tool.Setting)
+        gun.LimitedAmmoEnabled = false ; gun.Ammo = math.huge ; gun.MaxAmmo = math.huge ; gun.ReloadTime = 0 
+        gun.Auto = true ; gun.Recoil = 0 ; gun.Accuracy = 1 ; gun.Spread = 0 ; gun.BulletSpeed = 1000
+
+        if mode == "Freeze" then
+            gun.FreezingBullet = true ; gun.IcifyChance = 100 ; gun.FlamingBullet = false
+        elseif mode == "Fire" then
+            gun.FreezingBullet = false ; gun.FlamingBullet = true ; gun.BurnChance = 100
+        elseif mode == "Mixed" then
+            gun.FreezingBullet = true ; gun.IcifyChance = 100 
+            gun.FlamingBullet = true ; gun.BurnChance = 100
+        elseif mode == "Normal" then
+            gun.FreezingBullet = false ; gun.FlamingBullet = false
+        end
+        return true
+    end
+    return false
+end
+
+-- PAGE 4 Buttons
+local ModFreezeBtn = createBtn("❄️ GUN MOD FREEZE", Color3.fromRGB(0, 50, 100), Page4)
+local ModFireBtn = createBtn("🔥 GUN MOD FIRE", Color3.fromRGB(100, 50, 0), Page4)
+local ModMixedBtn = createBtn("⚡ GUN MOD FREEZE + FIRE", Color3.fromRGB(100, 0, 100), Page4)
+local ModNormalBtn = createBtn("🔫 GUN MOD NORMAL", Color3.fromRGB(40, 40, 40), Page4)
+
+ModFreezeBtn.MouseButton1Click:Connect(function() if ApplyGunMod("Freeze") then ModFreezeBtn.Text = "✅ SUCCESS!" task.wait(1) ModFreezeBtn.Text = "❄️ GUN MOD FREEZE" end end)
+ModFireBtn.MouseButton1Click:Connect(function() if ApplyGunMod("Fire") then ModFireBtn.Text = "✅ SUCCESS!" task.wait(1) ModFireBtn.Text = "🔥 GUN MOD FIRE" end end)
+ModMixedBtn.MouseButton1Click:Connect(function() if ApplyGunMod("Mixed") then ModMixedBtn.Text = "✅ SUCCESS!" task.wait(1) ModMixedBtn.Text = "⚡ GUN MOD FREEZE + FIRE" end end)
+ModNormalBtn.MouseButton1Click:Connect(function() if ApplyGunMod("Normal") then ModNormalBtn.Text = "✅ SUCCESS!" task.wait(1) ModNormalBtn.Text = "🔫 GUN MOD NORMAL" end end)
+
+-- PAGE 1 Buttons
+local GetItemBtn = createBtn("GET TELEPORT TOOL", Color3.fromRGB(40, 40, 40), Page1)
+local AutoBtn = createBtn("AUTO PROMPT: OFF", Color3.fromRGB(130, 0, 0), Page1)
+
+GetItemBtn.MouseButton1Click:Connect(function()
+	local tool = Instance.new("Tool", LocalPlayer.Backpack) 
+    tool.Name = "วาปของ+ตัว" 
+    tool.RequiresHandle = false
+	tool.Activated:Connect(function()
+		local t = Mouse.Target 
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if hrp and t and t:IsA("BasePart") then
+			t.CFrame = CFrame.new(TELEPORT_COORD)
+            task.wait(0.1)
+            hrp.CFrame = CFrame.new(TELEPORT_COORD + Vector3.new(0, 5, 0))
+		end
+	end)
+end)
+
+local autoActive = false
+AutoBtn.MouseButton1Click:Connect(function()
+    autoActive = not autoActive
+    AutoBtn.Text = autoActive and "AUTO PROMPT: ON" or "AUTO PROMPT: OFF"
+    AutoBtn.BackgroundColor3 = autoActive and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
+end)
+
+task.spawn(function()
+    while true do
+        if autoActive then
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and v.Enabled then
+                        fireproximityprompt(v)
+                    end
+                end
+            end)
+        end
+        task.wait(AUTO_PROMPT_DELAY)
+    end
+end)
+
+-- PAGE 2 Buttons
+local Section1 = Instance.new("TextLabel", Page2)
+Section1.Size = UDim2.new(1,0,0,30) ; Section1.Text = "[ GUN MODS ]" ; Section1.TextColor3 = AccentColor ; Section1.BackgroundTransparency = 1 ; Section1.Font = Enum.Font.GothamBold
+
+local ModGunBtn = createBtn("❄️ MOD HELD GUN (FREEZE)", Color3.fromRGB(40, 0, 0), Page2)
+ModGunBtn:FindFirstChildOfClass("UIStroke").Color = AccentColor
+ModGunBtn.MouseButton1Click:Connect(function()
+    if ApplyGunMod("Freeze") then ModGunBtn.Text = "✅ SUCCESS!" task.wait(2) ModGunBtn.Text = "❄️ MOD HELD GUN (FREEZE)" else ModGunBtn.Text = "❌ HOLD A GUN!" task.wait(2) ModGunBtn.Text = "❄️ MOD HELD GUN (FREEZE)" end
+end)
+
+local GhostBtn = createBtn("BOUNCING HEAD: OFF", Color3.fromRGB(130, 0, 0), Page2)
+local Section2 = Instance.new("TextLabel", Page2)
+Section2.Size = UDim2.new(1,0,0,30) ; Section2.Text = "[ STEAL TOOLS ]" ; Section2.TextColor3 = AccentColor ; Section2.BackgroundTransparency = 1 ; Section2.Font = Enum.Font.GothamBold
+
+local GunScroll = Instance.new("ScrollingFrame", Page2)
+GunScroll.Size = UDim2.new(1,-10,0,120) ; GunScroll.BackgroundColor3 = Color3.fromRGB(5,5,5) ; GunScroll.ScrollBarThickness = 2
+Instance.new("UIListLayout", GunScroll).Padding = UDim.new(0,5)
+Instance.new("UICorner", GunScroll)
+
+local RefreshGuns = createBtn("🔄 REFRESH PLAYER LIST", Color3.fromRGB(30, 30, 30), Page2)
+
+local ghostH = false
+GhostBtn.MouseButton1Click:Connect(function()
+    ghostH = not ghostH
+    GhostBtn.Text = ghostH and "BOUNCING HEAD: ON" or "BOUNCING HEAD: OFF"
+    GhostBtn.BackgroundColor3 = ghostH and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
+end)
+
+RunService.RenderStepped:Connect(function()
+    if ghostH then
+        local bouncingColor = GetBouncingColor()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                local h = p.Character.Head
+                h.Size = Vector3.new(6, 6, 6)
+                h.Color = bouncingColor 
+                h.CanCollide = false
+            end
+        end
+    end
+end)
+
+local function LoadGuns()
+	for _, v in pairs(GunScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			local items = {}
+			for _, t in pairs(p.Backpack:GetChildren()) do table.insert(items, t) end
+			if p.Character then for _, t in pairs(p.Character:GetChildren()) do if t:IsA("Tool") then table.insert(items, t) end end end
+			for _, tool in pairs(items) do
+				local b = createBtn(p.DisplayName.." : "..tool.Name, Color3.fromRGB(20, 20, 20), GunScroll)
+                b.TextSize = 10
+				b.MouseButton1Click:Connect(function() tool.Parent = LocalPlayer.Backpack end)
+			end
+		end
+	end
+end
+RefreshGuns.MouseButton1Click:Connect(LoadGuns)
+
+-- [[ PAGE 3: VISUALS ]] --
+local EspBtn = createBtn("ESP BOX: OFF", Color3.fromRGB(130, 0, 0), Page3)
+local HideNameBtn = createBtn("HIDE MY NAME", Color3.fromRGB(40, 40, 40), Page3)
+local TotalInvBtn = createBtn("TRACK ALL ITEMS (HEAD): OFF", Color3.fromRGB(130, 0, 0), Page3)
+
+local espActive = false
+EspBtn.MouseButton1Click:Connect(function()
+    espActive = not espActive
+    EspBtn.Text = espActive and "ESP BOX: ON" or "ESP BOX: OFF"
+    EspBtn.BackgroundColor3 = espActive and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
+end)
+
+local totalInvActive = false
+TotalInvBtn.MouseButton1Click:Connect(function()
+    totalInvActive = not totalInvActive
+    TotalInvBtn.Text = totalInvActive and "TRACK ALL ITEMS (HEAD): ON" or "TRACK ALL ITEMS (HEAD): OFF"
+    TotalInvBtn.BackgroundColor3 = totalInvActive and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
+    
+    if not totalInvActive then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Head") then
+                local old = p.Character.Head:FindFirstChild("TotalInvTag")
+                if old then old:Destroy() end
+            end
+        end
+    end
+end)
+
+-- Function สร้าง Billboard สำหรับแสดงผล
+local function CreateTotalInvTag(parent)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "TotalInvTag"
+    billboard.Size = UDim2.new(0, 200, 0, 200)
+    billboard.StudsOffset = Vector3.new(0, 5, 0) -- ขยับขึ้นสูงขึ้นอีกนิด
+    billboard.AlwaysOnTop = true
+    billboard.Parent = parent
+
+    local container = Instance.new("Frame", billboard)
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BackgroundTransparency = 1
+    
+    local list = Instance.new("UIListLayout", container)
+    list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    list.Padding = UDim.new(0, 2)
+
+    return billboard
+end
+
+-- Update Loop สำหรับเช็คไอเทม
+task.spawn(function()
+    while true do
+        if totalInvActive then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                    local head = p.Character.Head
+                    local tag = head:FindFirstChild("TotalInvTag") or CreateTotalInvTag(head)
+                    local container = tag:FindFirstChildOfClass("Frame")
+                    
+                    -- ล้างรายการเก่า
+                    for _, child in pairs(container:GetChildren()) do 
+                        if child:IsA("TextLabel") then child:Destroy() end 
+                    end
+
+                    local allItems = {}
+                    
+                    -- เช็คในกระเป๋า (Backpack)
+                    if p:FindFirstChild("Backpack") then
+                        for _, t in pairs(p.Backpack:GetChildren()) do
+                            if t:IsA("Tool") then 
+                                table.insert(allItems, {name = t.Name, status = "🎒"}) 
+                            end
+                        end
+                    end
+                    
+                    -- เช็คในมือ (Character)
+                    if p.Character then
+                        for _, t in pairs(p.Character:GetChildren()) do
+                            if t:IsA("Tool") then 
+                                table.insert(allItems, {name = t.Name, status = "✋"}) 
+                            end
+                        end
+                    end
+
+                    -- สร้างป้ายชื่อไอเทม
+                    if #allItems > 0 then
+                        for _, item in pairs(allItems) do
+                            local label = Instance.new("TextLabel", container)
+                            label.Size = UDim2.new(1, 0, 0, 20)
+                            label.BackgroundTransparency = 0.4
+                            label.BackgroundColor3 = (item.status == "✋") and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(20, 20, 20)
+                            label.TextColor3 = Color3.new(1, 1, 1)
+                            label.Text = item.status .. " " .. item.name
+                            label.Font = Enum.Font.GothamBold
+                            label.TextSize = 12
+                            label.ZIndex = 10
+                            
+                            local corner = Instance.new("UICorner", label)
+                            corner.CornerRadius = UDim.new(0, 5)
+                            
+                            local stroke = Instance.new("UIStroke", label)
+                            stroke.Thickness = 1
+                            stroke.Color = Color3.new(1, 1, 1)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+local function ManageESP(targetPlayer)
+    if targetPlayer == LocalPlayer then return end
+    local function addESP(char)
+        if not char then return end
+        local h = char:FindFirstChild("WarV2_ESP") or Instance.new("Highlight")
+        h.Name = "WarV2_ESP"
+        h.Parent = char
+        local conn
+        conn = RunService.RenderStepped:Connect(function()
+            if not char:IsDescendantOf(workspace) or not h.Parent then conn:Disconnect() return end
+            h.Enabled = espActive
+            if espActive then h.FillColor = GetBouncingColor() end 
+        end)
+    end
+    targetPlayer.CharacterAdded:Connect(addESP)
+    if targetPlayer.Character then addESP(targetPlayer.Character) end
+end
+for _, p in pairs(Players:GetPlayers()) do ManageESP(p) end
+Players.PlayerAdded:Connect(ManageESP)
+
+HideNameBtn.MouseButton1Click:Connect(function()
+    LocalPlayer.DisplayName = "Anonymous"
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.DisplayName = "Anonymous"
+    end
+    HideNameBtn.Text = "NAME HIDDEN"
+end)
+
+-- [[ TOGGLE BUTTON ]] --
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.Size = UDim2.new(0, 60, 0, 60)
+ToggleBtn.Position = UDim2.new(0, 15, 0.5, -30)
+ToggleBtn.BackgroundColor3 = SecondaryColor
+ToggleBtn.Text = "🔥"
+ToggleBtn.TextSize = 30
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
+local TS = Instance.new("UIStroke", ToggleBtn)
+TS.Color = AccentColor
+TS.Thickness = 2
+
+makeDraggable(ToggleBtn, ToggleBtn)
+ToggleBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+LoadGuns()

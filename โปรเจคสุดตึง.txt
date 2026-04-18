@@ -403,7 +403,7 @@ local function CreateTotalInvTag(parent)
     return billboard
 end
 
--- Update Loop สำหรับเช็คไอเทม
+-- Update Loop สำหรับเช็คไอเทม (ไม่ตรวจสอบ Fist หรือ หมัด)
 task.spawn(function()
     while true do
         if totalInvActive then
@@ -413,6 +413,14 @@ task.spawn(function()
                     local tag = head:FindFirstChild("TotalInvTag") or CreateTotalInvTag(head)
                     local container = tag:FindFirstChildOfClass("Frame")
                     
+                    -- จัดการ Layout ให้สวยงาม (ถ้ายังไม่มี)
+                    if not container:FindFirstChildOfClass("UIListLayout") then
+                        local layout = Instance.new("UIListLayout", container)
+                        layout.SortOrder = Enum.SortOrder.LayoutOrder
+                        layout.Padding = UDim.new(0, 4)
+                        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                    end
+
                     -- ล้างรายการเก่า
                     for _, child in pairs(container:GetChildren()) do 
                         if child:IsA("TextLabel") then child:Destroy() end 
@@ -420,43 +428,58 @@ task.spawn(function()
 
                     local allItems = {}
                     
+                    -- ฟังก์ชันช่วยตรวจสอบและเพิ่มไอเทม (เช็คชื่อ "Fist")
+                    local function checkAndAdd(tool, statusIcon, isEquipped)
+                        if tool:IsA("Tool") and tool.Name ~= "Fist" then 
+                            table.insert(allItems, {
+                                name = tool.Name, 
+                                status = statusIcon,
+                                isEquipped = isEquipped
+                            }) 
+                        end
+                    end
+
                     -- เช็คในกระเป๋า (Backpack)
                     if p:FindFirstChild("Backpack") then
                         for _, t in pairs(p.Backpack:GetChildren()) do
-                            if t:IsA("Tool") then 
-                                table.insert(allItems, {name = t.Name, status = "🎒"}) 
-                            end
+                            checkAndAdd(t, "📦", false) 
                         end
                     end
                     
                     -- เช็คในมือ (Character)
                     if p.Character then
                         for _, t in pairs(p.Character:GetChildren()) do
-                            if t:IsA("Tool") then 
-                                table.insert(allItems, {name = t.Name, status = "✋"}) 
-                            end
+                            checkAndAdd(t, "⚔️", true) -- เปลี่ยนไอคอนมือเป็นดาบให้ดูเท่ขึ้น
                         end
                     end
 
                     -- สร้างป้ายชื่อไอเทม
                     if #allItems > 0 then
                         for _, item in pairs(allItems) do
-                            local label = Instance.new("TextLabel", container)
-                            label.Size = UDim2.new(1, 0, 0, 20)
-                            label.BackgroundTransparency = 0.4
-                            label.BackgroundColor3 = (item.status == "✋") and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(20, 20, 20)
-                            label.TextColor3 = Color3.new(1, 1, 1)
-                            label.Text = item.status .. " " .. item.name
-                            label.Font = Enum.Font.GothamBold
-                            label.TextSize = 12
-                            label.ZIndex = 10
+                            local label = Instance.new("TextLabel")
+                            label.Name = "ItemLabel"
+                            label.Parent = container
+                            label.Size = UDim2.new(0, 120, 0, 22) -- ขนาดคงที่เพื่อให้ดูเป็นระเบียบ
+                            label.BackgroundTransparency = 0.2
                             
+                            -- ปรับสี: ถ้าถืออยู่สีแดงเข้ม/ส้ม ถ้าอยู่ในเป๋าสีเทาดำพรีเมียม
+                            label.BackgroundColor3 = item.isEquipped and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(30, 30, 35)
+                            
+                            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                            label.Text = " " .. item.status .. "  " .. item.name:upper() -- ตัวพิมพ์ใหญ่ให้ดู Clean
+                            label.Font = Enum.Font.GothamMedium
+                            label.TextSize = 11
+                            label.TextXAlignment = Enum.TextXAlignment.Left
+                            
+                            -- เพิ่มความโค้งมน
                             local corner = Instance.new("UICorner", label)
-                            corner.CornerRadius = UDim.new(0, 5)
+                            corner.CornerRadius = UDim.new(0, 4)
                             
+                            -- เพิ่มขอบบางๆ ให้ดูมีมิติ
                             local stroke = Instance.new("UIStroke", label)
-                            stroke.Thickness = 1
-                            stroke.Color = Color3.new(1, 1, 1)
+                            stroke.Thickness = 1.2
+                            stroke.Color = Color3.fromRGB(255, 255, 255)
+                            stroke.Transparency = 0.8
                         end
                     end
                 end
@@ -465,6 +488,7 @@ task.spawn(function()
         task.wait(0.5)
     end
 end)
+
 
 local function ManageESP(targetPlayer)
     if targetPlayer == LocalPlayer then return end

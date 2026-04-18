@@ -382,28 +382,90 @@ TotalInvBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Function สร้าง Billboard สำหรับแสดงผล
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- // CONFIGURATION
+local UI_SETTINGS = {
+    TagSize = UDim2.new(0, 200, 0, 150),
+    LabelSize = UDim2.new(0, 140, 0, 24),
+    EquippedColor = Color3.fromRGB(255, 60, 60), -- สีแดงสดเวลาถือ
+    BackpackColor = Color3.fromRGB(45, 45, 45), -- สีเทาเข้มในกระเป๋า
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    ExcludedTools = {["Fist"] = true, ["Punch"] = true} -- รายชื่อไอเทมที่ไม่ต้องแสดง
+}
+
+-- // FUNCTION: สร้างป้าย Billboard
 local function CreateTotalInvTag(parent)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "TotalInvTag"
-    billboard.Size = UDim2.new(0, 200, 0, 200)
-    billboard.StudsOffset = Vector3.new(0, 5, 0) -- ขยับขึ้นสูงขึ้นอีกนิด
+    billboard.Size = UI_SETTINGS.TagSize
+    billboard.StudsOffset = Vector3.new(0, 4.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = parent
 
-    local container = Instance.new("Frame", billboard)
+    local container = Instance.new("Frame")
+    container.Name = "Container"
     container.Size = UDim2.new(1, 0, 1, 0)
     container.BackgroundTransparency = 1
+    container.Parent = billboard
     
-    local list = Instance.new("UIListLayout", container)
+    local list = Instance.new("UIListLayout")
+    list.SortOrder = Enum.SortOrder.LayoutOrder
     list.VerticalAlignment = Enum.VerticalAlignment.Bottom
     list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    list.Padding = UDim.new(0, 2)
+    list.Padding = UDim.new(0, 5)
+    list.Parent = container
 
     return billboard
 end
 
--- Update Loop สำหรับเช็คไอเทม (เวอร์ชันปรับปรุง)
+-- // FUNCTION: สร้างหรือดึง Label (Object Management)
+local function GetOrCreateLabel(container, index, itemName, statusIcon)
+    local labelName = "Item_" .. index
+    local label = container:FindFirstChild(labelName)
+
+    if not label then
+        label = Instance.new("TextLabel")
+        label.Name = labelName
+        label.Size = UI_SETTINGS.LabelSize
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = UI_SETTINGS.Font
+        label.TextSize = UI_SETTINGS.TextSize
+        label.ZIndex = 10
+        label.Parent = container
+
+        -- เพิ่มความโค้งมน
+        local corner = Instance.new("UICorner", label)
+        corner.CornerRadius = UDim.new(0, 6)
+
+        -- เพิ่มเส้นขอบพรีเมียม
+        local stroke = Instance.new("UIStroke", label)
+        stroke.Thickness = 1.5
+        stroke.Transparency = 0.5
+        stroke.Color = Color3.new(1, 1, 1)
+
+        -- เพิ่ม Gradient ให้ดูมีมิติ
+        local gradient = Instance.new("UIGradient", label)
+        gradient.Rotation = 90
+        gradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 200))
+        })
+    end
+
+    -- อัปเดตข้อมูล (Update Properties)
+    local isEquipped = (statusIcon == "⚔️")
+    label.Text = string.format("%s  %s", statusIcon, itemName:upper())
+    label.BackgroundColor3 = isEquipped and UI_SETTINGS.EquippedColor or UI_SETTINGS.BackpackColor
+    label.BackgroundTransparency = 0.2
+    label.Visible = true
+    
+    return label
+end
+
+-- // MAIN LOOP
 task.spawn(function()
     while true do
         if totalInvActive then
@@ -411,72 +473,43 @@ task.spawn(function()
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
                     local head = p.Character.Head
                     local tag = head:FindFirstChild("TotalInvTag") or CreateTotalInvTag(head)
-                    local container = tag:FindFirstChildOfClass("Frame")
+                    local container = tag.Container
                     
-                    -- จัดการ Layout ให้สวยงาม (ถ้ายังไม่มี)
-                    if not container:FindFirstChild("UIListLayout") then
-                        local layout = Instance.new("UIListLayout", container)
-                        layout.SortOrder = Enum.SortOrder.LayoutOrder
-                        layout.Padding = UDim.new(0, 4)
-                        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                    local currentItems = {}
+
+                    -- 1. เก็บข้อมูลไอเทมที่ถืออยู่
+                    for _, t in pairs(p.Character:GetChildren()) do
+                        if t:IsA("Tool") and not UI_SETTINGS.ExcludedTools[t.Name] then
+                            table.insert(currentItems, {name = t.Name, icon = "⚔️"})
+                        end
                     end
 
-                    -- ล้างรายการเก่า
-                    for _, child in pairs(container:GetChildren()) do 
-                        if child:IsA("TextLabel") then child:Destroy() end 
-                    end
-
-                    local allItems = {}
-                    
-                    -- ฟังก์ชันช่วยกรองและเก็บข้อมูลไอเทม
-                    local function collectTools(parent, statusIcon)
-                        for _, t in pairs(parent:GetChildren()) do
-                            -- ตรวจสอบว่าเป็น Tool และชื่อต้องไม่ใช่ "Fist"
-                            if t:IsA("Tool") and t.Name ~= "Fist" then 
-                                table.insert(allItems, {name = t.Name, status = statusIcon}) 
+                    -- 2. เก็บข้อมูลไอเทมในกระเป๋า
+                    if p:FindFirstChild("Backpack") then
+                        for _, t in pairs(p.Backpack:GetChildren()) do
+                            if t:IsA("Tool") and not UI_SETTINGS.ExcludedTools[t.Name] then
+                                table.insert(currentItems, {name = t.Name, icon = "🎒"})
                             end
                         end
                     end
 
-                    -- ตรวจสอบทั้งในกระเป๋าและในมือ
-                    if p:FindFirstChild("Backpack") then collectTools(p.Backpack, "🎒") end
-                    if p.Character then collectTools(p.Character, "✋") end
+                    -- 3. อัปเดต UI (Reuse Labels)
+                    -- ซ่อน Label เก่าก่อน
+                    for _, child in pairs(container:GetChildren()) do
+                        if child:IsA("TextLabel") then child.Visible = false end
+                    end
 
-                    -- สร้างรายการ UI
-                    if #allItems > 0 then
-                        for _, item in pairs(allItems) do
-                            local label = Instance.new("TextLabel")
-                            label.Name = "ItemLabel"
-                            label.Parent = container
-                            label.Size = UDim2.new(0, 120, 0, 22) -- ปรับขนาดให้พอดี
-                            label.BackgroundTransparency = 0.3
-                            
-                            -- เปลี่ยนสีตามสถานะ (ถืออยู่ = สีแดงเข้ม / ในกระเป๋า = สีเทาเข้ม)
-                            label.BackgroundColor3 = (item.status == "✋") and Color3.fromRGB(150, 40, 40) or Color3.fromRGB(30, 30, 30)
-                            
-                            label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                            label.Text = item.status .. " " .. item.name
-                            label.Font = Enum.Font.GothamMedium
-                            label.TextSize = 11
-                            label.ZIndex = 10
-                            
-                            -- เพิ่มความโค้งมน
-                            local corner = Instance.new("UICorner", label)
-                            corner.CornerRadius = UDim.new(0, 6)
-                            
-                            -- เพิ่มเส้นขอบบางๆ ให้ดูพรีเมียม
-                            local stroke = Instance.new("UIStroke", label)
-                            stroke.Thickness = 1.2
-                            stroke.Color = Color3.fromRGB(255, 255, 255)
-                            stroke.Transparency = 0.6
-                        end
+                    -- แสดงผลรายการใหม่
+                    for i, item in ipairs(currentItems) do
+                        GetOrCreateLabel(container, i, item.name, item.icon)
                     end
                 end
             end
         end
-        task.wait(0.5) -- หน่วงเวลาเพื่อลดภาระเครื่อง
+        task.wait(0.5)
     end
 end)
+
 
 
 local function ManageESP(targetPlayer)

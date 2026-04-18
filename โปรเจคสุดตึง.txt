@@ -403,22 +403,45 @@ local function CreateTotalInvTag(parent)
     return billboard
 end
 
--- Update Loop สำหรับเช็คไอเทม (ไม่ตรวจสอบ Fist หรือ หมัด)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- เช็คว่ามีฟังก์ชันสร้าง Tag หรือยัง ถ้าไม่มีให้สร้างไว้ (กัน Error)
+local function CreateTotalInvTag(head)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "TotalInvTag"
+    billboard.Size = UDim2.new(0, 200, 0, 100)
+    billboard.StudsOffset = Vector3.new(0, 3, 0) -- ให้ลอยเหนือหัว
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+
+    local frame = Instance.new("Frame", billboard)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    
+    return billboard
+end
+
+-- ตั้งค่าเปิด/ปิดระบบ (ถ้าในสคริปต์อื่นคุณมีตัวแปรนี้อยู่แล้ว ให้ลบบรรทัดนี้ออก)
+_G.totalInvActive = true 
+
 task.spawn(function()
     while true do
-        if totalInvActive then
+        -- ใช้ _G. เพื่อดึงค่าจากสคริปต์อื่น หรือใช้ totalInvActive ถ้ามีใน Local
+        if _G.totalInvActive or totalInvActive then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
                     local head = p.Character.Head
                     local tag = head:FindFirstChild("TotalInvTag") or CreateTotalInvTag(head)
                     local container = tag:FindFirstChildOfClass("Frame")
                     
-                    -- จัดการ Layout ให้สวยงาม (ถ้ายังไม่มี)
+                    -- ตรวจสอบ UIListLayout
                     if not container:FindFirstChildOfClass("UIListLayout") then
                         local layout = Instance.new("UIListLayout", container)
                         layout.SortOrder = Enum.SortOrder.LayoutOrder
                         layout.Padding = UDim.new(0, 4)
                         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                        layout.VerticalAlignment = Enum.VerticalAlignment.Bottom -- เรียงจากล่างขึ้นบน
                     end
 
                     -- ล้างรายการเก่า
@@ -428,7 +451,7 @@ task.spawn(function()
 
                     local allItems = {}
                     
-                    -- ฟังก์ชันช่วยตรวจสอบและเพิ่มไอเทม (เช็คชื่อ "Fist")
+                    -- ฟังก์ชันกรองไอเทม (ไม่เอา Fist)
                     local function checkAndAdd(tool, statusIcon, isEquipped)
                         if tool:IsA("Tool") and tool.Name ~= "Fist" then 
                             table.insert(allItems, {
@@ -439,48 +462,30 @@ task.spawn(function()
                         end
                     end
 
-                    -- เช็คในกระเป๋า (Backpack)
+                    -- เช็คไอเทม
                     if p:FindFirstChild("Backpack") then
-                        for _, t in pairs(p.Backpack:GetChildren()) do
-                            checkAndAdd(t, "📦", false) 
-                        end
+                        for _, t in pairs(p.Backpack:GetChildren()) do checkAndAdd(t, "📦", false) end
                     end
-                    
-                    -- เช็คในมือ (Character)
                     if p.Character then
-                        for _, t in pairs(p.Character:GetChildren()) do
-                            checkAndAdd(t, "⚔️", true) -- เปลี่ยนไอคอนมือเป็นดาบให้ดูเท่ขึ้น
-                        end
+                        for _, t in pairs(p.Character:GetChildren()) do checkAndAdd(t, "⚔️", true) end
                     end
 
-                    -- สร้างป้ายชื่อไอเทม
-                    if #allItems > 0 then
-                        for _, item in pairs(allItems) do
-                            local label = Instance.new("TextLabel")
-                            label.Name = "ItemLabel"
-                            label.Parent = container
-                            label.Size = UDim2.new(0, 120, 0, 22) -- ขนาดคงที่เพื่อให้ดูเป็นระเบียบ
-                            label.BackgroundTransparency = 0.2
-                            
-                            -- ปรับสี: ถ้าถืออยู่สีแดงเข้ม/ส้ม ถ้าอยู่ในเป๋าสีเทาดำพรีเมียม
-                            label.BackgroundColor3 = item.isEquipped and Color3.fromRGB(180, 50, 50) or Color3.fromRGB(30, 30, 35)
-                            
-                            label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                            label.Text = " " .. item.status .. "  " .. item.name:upper() -- ตัวพิมพ์ใหญ่ให้ดู Clean
-                            label.Font = Enum.Font.GothamMedium
-                            label.TextSize = 11
-                            label.TextXAlignment = Enum.TextXAlignment.Left
-                            
-                            -- เพิ่มความโค้งมน
-                            local corner = Instance.new("UICorner", label)
-                            corner.CornerRadius = UDim.new(0, 4)
-                            
-                            -- เพิ่มขอบบางๆ ให้ดูมีมิติ
-                            local stroke = Instance.new("UIStroke", label)
-                            stroke.Thickness = 1.2
-                            stroke.Color = Color3.fromRGB(255, 255, 255)
-                            stroke.Transparency = 0.8
-                        end
+                    -- สร้าง Label
+                    for _, item in pairs(allItems) do
+                        local label = Instance.new("TextLabel")
+                        label.Parent = container
+                        label.Size = UDim2.new(0, 100, 0, 20)
+                        label.BackgroundColor3 = item.isEquipped and Color3.fromRGB(200, 60, 60) or Color3.fromRGB(40, 40, 40)
+                        label.BackgroundTransparency = 0.3
+                        label.Text = " " .. item.status .. " " .. item.name
+                        label.TextColor3 = Color3.new(1, 1, 1)
+                        label.Font = Enum.Font.GothamBold
+                        label.TextSize = 10
+                        
+                        Instance.new("UICorner", label).CornerRadius = UDim.new(0, 4)
+                        local stroke = Instance.new("UIStroke", label)
+                        stroke.Color = Color3.new(0, 0, 0)
+                        stroke.Thickness = 0.5
                     end
                 end
             end

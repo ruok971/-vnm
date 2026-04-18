@@ -403,97 +403,110 @@ local function CreateTotalInvTag(parent)
     return billboard
 end
 
+-- [[ CONFIGURATION ]] --
+local SHOW_FIST = false -- ตั้งเป็น false เพื่อไม่ให้โชว์ Fist
+local UPDATE_SPEED = 0.5 -- ความเร็วในการสแกน (วินาที)
+local UI_WIDTH = 120 -- ความกว้างของป้ายชื่อไอเทม
+
+-- [[ SERVICES ]] --
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- เช็คว่ามีฟังก์ชันสร้าง Tag หรือยัง ถ้าไม่มีให้สร้างไว้ (กัน Error)
+-- [[ FUNCTIONS ]] --
 local function CreateTotalInvTag(head)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "TotalInvTag"
-    billboard.Size = UDim2.new(0, 200, 0, 100)
-    billboard.StudsOffset = Vector3.new(0, 3, 0) -- ให้ลอยเหนือหัว
-    billboard.AlwaysOnTop = true
-    billboard.Parent = head
+	local tag = head:FindFirstChild("TotalInvTag")
+	if not tag then
+		tag = Instance.new("BillboardGui")
+		tag.Name = "TotalInvTag"
+		tag.Size = UDim2.new(0, UI_WIDTH, 0, 100)
+		tag.StudsOffset = Vector3.new(0, 3, 0)
+		tag.AlwaysOnTop = true
+		tag.Parent = head
 
-    local frame = Instance.new("Frame", billboard)
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundTransparency = 1
-    
-    return billboard
+		local frame = Instance.new("Frame", tag)
+		frame.Name = "Container"
+		frame.Size = UDim2.new(1, 0, 1, 0)
+		frame.BackgroundTransparency = 1
+		
+		-- จัดระเบียบการเรียงไอเทมจากล่างขึ้นบน
+		local layout = Instance.new("UIListLayout", frame)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, 4)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	end
+	return tag
 end
 
--- ตั้งค่าเปิด/ปิดระบบ (ถ้าในสคริปต์อื่นคุณมีตัวแปรนี้อยู่แล้ว ให้ลบบรรทัดนี้ออก)
-_G.totalInvActive = true 
-
+-- [[ MAIN LOOP ]] --
 task.spawn(function()
-    while true do
-        -- ใช้ _G. เพื่อดึงค่าจากสคริปต์อื่น หรือใช้ totalInvActive ถ้ามีใน Local
-        if _G.totalInvActive or totalInvActive then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                    local head = p.Character.Head
-                    local tag = head:FindFirstChild("TotalInvTag") or CreateTotalInvTag(head)
-                    local container = tag:FindFirstChildOfClass("Frame")
-                    
-                    -- ตรวจสอบ UIListLayout
-                    if not container:FindFirstChildOfClass("UIListLayout") then
-                        local layout = Instance.new("UIListLayout", container)
-                        layout.SortOrder = Enum.SortOrder.LayoutOrder
-                        layout.Padding = UDim.new(0, 4)
-                        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-                        layout.VerticalAlignment = Enum.VerticalAlignment.Bottom -- เรียงจากล่างขึ้นบน
-                    end
+	while true do
+		-- รันตลอดเวลา ถ้าคุณมีปุ่มเปิดปิด ให้ใช้ if YourVariable then
+		for _, p in pairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+				local head = p.Character.Head
+				local tag = CreateTotalInvTag(head)
+				local container = tag:FindFirstChild("Container")
+				
+				-- ล้างรายการเก่าออกก่อน Update ใหม่
+				if container then
+					for _, child in pairs(container:GetChildren()) do 
+						if child:IsA("TextLabel") then child:Destroy() end 
+					end
+				end
 
-                    -- ล้างรายการเก่า
-                    for _, child in pairs(container:GetChildren()) do 
-                        if child:IsA("TextLabel") then child:Destroy() end 
-                    end
+				local allItems = {}
+				
+				-- 1. เช็คในเป้ (Backpack)
+				if p:FindFirstChild("Backpack") then
+					for _, t in pairs(p.Backpack:GetChildren()) do
+						if t:IsA("Tool") then
+							if not SHOW_FIST and t.Name == "Fist" then continue end
+							table.insert(allItems, {name = t.Name, icon = "🎒", color = Color3.fromRGB(35, 35, 40), order = 2})
+						end
+					end
+				end
+				
+				-- 2. เช็คในมือ (Character)
+				if p.Character then
+					for _, t in pairs(p.Character:GetChildren()) do
+						if t:IsA("Tool") then
+							if not SHOW_FIST and t.Name == "Fist" then continue end
+							table.insert(allItems, {name = t.Name, icon = "⚔️", color = Color3.fromRGB(160, 40, 40), order = 1})
+						end
+					end
+				end
 
-                    local allItems = {}
-                    
-                    -- ฟังก์ชันกรองไอเทม (ไม่เอา Fist)
-                    local function checkAndAdd(tool, statusIcon, isEquipped)
-                        if tool:IsA("Tool") and tool.Name ~= "Fist" then 
-                            table.insert(allItems, {
-                                name = tool.Name, 
-                                status = statusIcon,
-                                isEquipped = isEquipped
-                            }) 
-                        end
-                    end
-
-                    -- เช็คไอเทม
-                    if p:FindFirstChild("Backpack") then
-                        for _, t in pairs(p.Backpack:GetChildren()) do checkAndAdd(t, "📦", false) end
-                    end
-                    if p.Character then
-                        for _, t in pairs(p.Character:GetChildren()) do checkAndAdd(t, "⚔️", true) end
-                    end
-
-                    -- สร้าง Label
-                    for _, item in pairs(allItems) do
-                        local label = Instance.new("TextLabel")
-                        label.Parent = container
-                        label.Size = UDim2.new(0, 100, 0, 20)
-                        label.BackgroundColor3 = item.isEquipped and Color3.fromRGB(200, 60, 60) or Color3.fromRGB(40, 40, 40)
-                        label.BackgroundTransparency = 0.3
-                        label.Text = " " .. item.status .. " " .. item.name
-                        label.TextColor3 = Color3.new(1, 1, 1)
-                        label.Font = Enum.Font.GothamBold
-                        label.TextSize = 10
-                        
-                        Instance.new("UICorner", label).CornerRadius = UDim.new(0, 4)
-                        local stroke = Instance.new("UIStroke", label)
-                        stroke.Color = Color3.new(0, 0, 0)
-                        stroke.Thickness = 0.5
-                    end
-                end
-            end
-        end
-        task.wait(0.5)
-    end
+				-- สร้าง UI Label ให้สวยงาม
+				for _, item in pairs(allItems) do
+					local label = Instance.new("TextLabel")
+					label.Parent = container
+					label.Size = UDim2.new(1, 0, 0, 22)
+					label.BackgroundColor3 = item.color
+					label.BackgroundTransparency = 0.15
+					label.BorderSizePixel = 0
+					label.Text = " " .. item.icon .. "  " .. item.name:upper()
+					label.TextColor3 = Color3.fromRGB(255, 255, 255)
+					label.Font = Enum.Font.GothamBold
+					label.TextSize = 10
+					label.TextXAlignment = Enum.TextXAlignment.Left
+					label.LayoutOrder = item.order -- ให้ของที่ถืออยู่ (⚔️) อยู่บนสุด
+					
+					-- ตกแต่งขอบมน
+					local corner = Instance.new("UICorner", label)
+					corner.CornerRadius = UDim.new(0, 4)
+					
+					-- เพิ่มเส้นขอบบางๆ ให้ดูหรู
+					local stroke = Instance.new("UIStroke", label)
+					stroke.Thickness = 1
+					stroke.Color = Color3.fromRGB(255, 255, 255)
+					stroke.Transparency = 0.8
+				end
+			end
+		end
+		task.wait(UPDATE_SPEED)
+	end
 end)
-
 
 local function ManageESP(targetPlayer)
     if targetPlayer == LocalPlayer then return end
